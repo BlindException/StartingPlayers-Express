@@ -147,6 +147,9 @@ const positionFilter = req.query.position;
 const teamFilter = req.query.team;
 
 
+const searchFilter = req.query.search;
+
+
 var playerConditions = [];
 
 
@@ -172,6 +175,18 @@ playerConditions.push('team = ?');
 
 
 playerParams.push(teamFilter);
+
+
+}
+
+
+if (searchFilter) {
+
+
+playerConditions.push('name LIKE ?');
+
+
+playerParams.push('%' + searchFilter + '%');
 
 
 }
