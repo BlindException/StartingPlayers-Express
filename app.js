@@ -18,8 +18,8 @@ app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cors({
-origin: 'https://startingplayers-react-d9d6ab4263ee.herokuapp.com'
-  }));
+  origin: 'https://startingplayers-react-d9d6ab4263ee.herokuapp.com'
+  })console.log('Using CORS MW'););
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
