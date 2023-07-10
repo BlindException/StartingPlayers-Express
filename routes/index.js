@@ -259,8 +259,8 @@ position: row.position,
 
 
 percent: starter.starts,
-
-
+percentOfPlayers:0,
+percentOfStarts:0,
 };
 
 
@@ -309,6 +309,13 @@ var totalStartsByQuery=0;
 for(var i = 0;i<totalPlayers;i++)
 {
     totalStartsByQuery+=sortedByPercent[i].percent;
+}
+for(var i = 0;i<totalPlayers;i++)
+{
+    let pop = (1/totalPlayers)*100;
+    let pos = (sortedByPercent[i].percent/totalStartsByQuery)*100;
+    sortedByPercent[i].percentOfPlayers=pop.toFixed(2);
+    sortedByPercent[i].percentOfStarts=pos.toFixed(2);
 }
 const totalFailed = failedIds.length;
 
