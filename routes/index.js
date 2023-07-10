@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var db = require('../lib/db');
-router.get('/api/', (req, res) => {
+router.get('/', (req, res) => {
 const leagueFilter = req.query.leagueType;
 const weekFilter = req.query.week;
 
@@ -304,18 +304,16 @@ players.splice(a, 1);
 
 
 const sortedByPercent = players.flat().sort((a, b) => b.percent - a.percent);
+const totalPlayers = sortedByPercent.length;
+var totalStartsByQuery=0;
+for(var i = 0;i<totalPlayers;i++)
+{
+    totalStartsByQuery+=sortedByPercent[i].percent;
+}
+const totalFailed = failedIds.length;
 
 
-var totalUnique = uniqueStarters.length;
-
-
-var totalPlayers = players.length;
-
-
-var totalFailed = failedIds.length;
-
-
-res.json(sortedByPercent);
+res.json({sortedByPercent, totalPlayers, totalStartsByQuery});
 
 
 })
