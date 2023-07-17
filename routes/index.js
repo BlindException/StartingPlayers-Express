@@ -1,24 +1,73 @@
 var express = require('express');
+
+
 var router = express.Router();
+
+
 var db = require('../lib/db');
-router.get('/', (req, res) => {
-const leagueFilter = req.query.leagueType;
-const weekFilter = req.query.week;
 
 
-var query = 'SELECT winners.league_id, winners.starters, winners.week, leagues.type FROM winners JOIN leagues ON leagues.id = winners.league_id';
+router.get('/', async (req, res) => {
 
 
-var conditions = [];
+try {
 
 
-var params = [];
+const leagueFilter = req.query.leagueType || null;
+
+
+const weekFilter = req.query.week || null;
+
+
+const positionFilter = req.query.position || null;
+
+
+const teamFilter = req.query.team || null;
+
+
+const searchFilter = req.query.search || null;
+
+
+const sortedBy = req.query.sortedBy || 'starter_count';
+
+
+const sortOrder = req.query.sortOrder || 'DESC';
+
+
+let query = `
+
+
+SELECT players.*, COUNT(*) AS player_count,
+
+
+SUM(CASE WHEN rosters.status = 'starter' THEN 1 ELSE 0 END) AS starter_count,
+
+
+SUM(CASE WHEN rosters.status = 'nonstarter' THEN 1 ELSE 0 END) AS nonstarter_count,
+
+
+ROUND((SUM(CASE WHEN rosters.status = 'starter' THEN 1 ELSE 0 END) / COUNT(*)) * 100, 2) AS starting_percent
+
+
+FROM rosters
+
+
+JOIN players ON rosters.player_id = players.id
+
+
+JOIN leagues ON rosters.league_id = leagues.id`;
+
+
+const conditions = [];
+
+
+const params = [];
 
 
 if (leagueFilter) {
 
 
-conditions.push('type = ?');
+conditions.push('leagues.type = ?');
 
 
 params.push(leagueFilter);
@@ -39,6 +88,42 @@ params.push(weekFilter);
 }
 
 
+if (positionFilter) {
+
+
+conditions.push('players.position = ?');
+
+
+params.push(positionFilter);
+
+
+}
+
+
+if (teamFilter) {
+
+
+conditions.push('players.team = ?');
+
+
+params.push(teamFilter);
+
+
+}
+
+
+if (searchFilter) {
+
+
+conditions.push('players.name LIKE ?');
+
+
+params.push(`%${searchFilter}%`);
+
+
+}
+
+
 if (conditions.length > 0) {
 
 
@@ -48,300 +133,34 @@ query += ' WHERE ' + conditions.join(' AND ');
 }
 
 
-db.query(query, params, (err, results) => {
+if (['starter_count', 'nonstarter_count', 'starting_percent'].includes(sortedBy)) {
 
 
-if (err) {
-
-
-console.error(err);
-
-
-res.status(500).send('Error retrieving data');
+query += ` GROUP BY players.id ORDER BY ${sortedBy} ${sortOrder}`;
 
 
 } else {
 
 
-var totalStarters = 0;
-
-
-var uniqueStarters = [];
-
-
-const occurrences = {};
-
-
-var failedIds = [];
-
-
-const responseData = results.map((row) => {
-
-
-const starters = row.starters.split(',');
-
-
-const week = row.week;
-
-
-starters.forEach((starter) => {
-
-
-if (occurrences[starter]) {
-
-
-for (var j = 0; j < uniqueStarters.length; j++) {
-
-
-if (uniqueStarters[j].id == starter) {
-
-
-uniqueStarters[j].starts++;
+query += ` GROUP BY players.id ORDER BY players.${sortedBy} ${sortOrder}`;
 
 
 }
 
 
-}
-
-
-occurrences[starter]++;
-
-
-} else {
-
-
-uniqueStarters.push({
-
-
-id: starter,
-
-
-starts: 1,
-
-
-});
-
-
-occurrences[starter] = 1;
-
-
-}
-
-
-totalStarters++;
-
-
-});
-
-
-});
-
-
-var playerQuery = 'SELECT id, name, team, position FROM players WHERE id = ?';
-
-
-const positionFilter = req.query.position;
-
-
-const teamFilter = req.query.team;
-
-
-const searchFilter = req.query.search;
-
-
-var playerConditions = [];
-
-
-var playerParams = [];
-
-
-if (positionFilter) {
-
-
-playerConditions.push('position = ?');
-
-
-playerParams.push(positionFilter);
-
-
-}
-
-
-if (teamFilter) {
-
-
-playerConditions.push('team = ?');
-
-
-playerParams.push(teamFilter);
-
-
-}
-
-
-if (searchFilter) {
-
-
-playerConditions.push('name LIKE ?');
-
-
-playerParams.push('%' + searchFilter + '%');
-
-
-}
-
-
-if (playerConditions.length > 0) {
-
-
-playerQuery += ' AND ' + playerConditions.join(' AND ');
-
-
-}
-
-
-var playerQueries = uniqueStarters
-
-
-.filter((starter) => starter.id !== null)
-
-
-.map((starter) => {
-
-
-return new Promise((resolve, reject) => {
-
-
-var queryParams = [starter.id];
-
-
-queryParams = queryParams.concat(playerParams);
-
-
-db.query(playerQuery, queryParams, (error, playerResults) => {
-
-
-if (error) {
-
-
-reject(error);
-
-
-} else {
-
-
-if (playerResults.length === 0) {
-
-
-failedIds.push(starter.id);
-
-
-}
-
-
-const players = playerResults.map((row) => {
-
-
-return {
-
-
-id: row.id,
-
-
-name: row.name,
-
-
-team: row.team,
-
-
-position: row.position,
-
-
-percent: starter.starts,
-percentOfPlayers:0,
-percentOfStarts:0,
-};
-
-
-});
-
-
-resolve(players);
-
-
-}
-
-
-});
-
-
-});
-
-
-});
-
-
-Promise.all(playerQueries)
-
-
-.then((players) => {
-
-
-for (var a = 0; a < players.length; a++) {
-
-
-if (players[a] == []) {
-
-
-players.splice(a, 1);
-
-
-}
-
-
-}
-
-
-const sortedByPercent = players.flat().sort((a, b) => b.percent - a.percent);
-const totalPlayers = sortedByPercent.length;
-var totalStartsByQuery=0;
-for(var i = 0;i<totalPlayers;i++)
-{
-    totalStartsByQuery+=sortedByPercent[i].percent;
-}
-for(var i = 0;i<totalPlayers;i++)
-{
-    let pop = (1/totalPlayers)*100;
-    let pos = (sortedByPercent[i].percent/totalStartsByQuery)*100;
-    sortedByPercent[i].percentOfPlayers=pop.toFixed(2);
-    sortedByPercent[i].percentOfStarts=pos.toFixed(2);
-}
-const totalFailed = failedIds.length;
-
-
-res.json({sortedByPercent, totalPlayers, totalStartsByQuery});
-
-
-})
-
-
-.catch((error) => {
+db.query(query, params,((errors, results)=>{
+    res.json({results});
+}));
+} catch (error) {
 
 
 console.error(error);
 
 
-res.status(500).send('Error retrieving player data');
-
-
-});
+res.status(500).json({ error: 'Internal Server Error' });
 
 
 }
-
-
-});
 
 
 });
