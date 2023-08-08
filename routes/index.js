@@ -22,74 +22,33 @@ FROM safe_rosters
 JOIN players ON safe_rosters.player_id = players.id
 JOIN leagues ON safe_rosters.league_id = leagues.id`;
 const conditions = [];
-
 const params = [];
-
 if (leagueFilter) {
-
 conditions.push('leagues.type = ?');
-
 params.push(leagueFilter);
-
 }
-
 if (weekFilter) {
-
 conditions.push('week = ?');
-
 params.push(weekFilter);
-
 }
-
 if (positionFilter) {
-
 conditions.push('players.position = ?');
 params.push(positionFilter);
 }
-
-
 if (teamFilter) {
-
-
 conditions.push('players.team = ?');
-
-
 params.push(teamFilter);
-
-
 }
-
-
 if (searchFilter) {
-
-
 conditions.push('players.name LIKE ?');
-
-
 params.push(`%${searchFilter}%`);
-
-
 }
-
-
 if (conditions.length > 0) {
-
-
 query += ' WHERE ' + conditions.join(' AND ');
-
-
 }
-
-
-if (['starter_count', 'nonstarter_count', 'starting_percent'].includes(sortedBy)) {
-
-
+if (['starter_count', 'nonstarter_count', 'starting_percent', 'w_starts', 'l_starts', 'starting_win_percent'].includes(sortedBy)) {
 query += ` GROUP BY players.id ORDER BY ${sortedBy} ${sortOrder}`;
-
-
 } else {
-
-
 query += ` GROUP BY players.id ORDER BY players.${sortedBy} ${sortOrder}`;
 
 
