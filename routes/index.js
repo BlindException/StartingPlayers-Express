@@ -1,100 +1,50 @@
 var express = require('express');
 var router = express.Router();
-
-
 var db = require('../lib/db');
-
-
 router.get('/', async (req, res) => {
-
-
 try {
-
-
 const leagueFilter = req.query.leagueType || null;
-
-
 const weekFilter = req.query.week || null;
-
-
 const positionFilter = req.query.position || null;
-
-
 const teamFilter = req.query.team || null;
-
-
 const searchFilter = req.query.search || null;
-
-
 const sortedBy = req.query.sortedBy || 'starter_count';
-
-
 const sortOrder = req.query.sortOrder || 'DESC';
-
-
 let query = `
-
-
 SELECT players.*, COUNT(*) AS player_count,
-
-
-SUM(CASE WHEN rosters.status = 'starter' THEN 1 ELSE 0 END) AS starter_count,
-
-
-SUM(CASE WHEN rosters.status = 'nonstarter' THEN 1 ELSE 0 END) AS nonstarter_count,
-
-
-ROUND((SUM(CASE WHEN rosters.status = 'starter' THEN 1 ELSE 0 END) / COUNT(*)) * 100, 2) AS starting_percent
-
-
-FROM rosters
-
-
-JOIN players ON rosters.player_id = players.id
-
-
-JOIN leagues ON rosters.league_id = leagues.id`;
-
-
+SUM(CASE WHEN safe_rosters.status = 'starter' THEN 1 ELSE 0 END) AS starter_count,
+SUM(CASE WHEN safe_rosters.status = 'nonstarter' THEN 1 ELSE 0 END) AS nonstarter_count,
+ROUND((SUM(CASE WHEN safe_rosters.status = 'starter' THEN 1 ELSE 0 END) / COUNT(*)) * 100, 2) AS starting_percent,
+SUM(CASE WHEN safe_rosters.status = 'starter' AND safe_rosters.result = 'W' THEN 1 ELSE 0 END) AS w_starts,
+SUM(CASE WHEN safe_rosters.status = 'starter' AND safe_rosters.result = 'L' THEN 1 ELSE 0 END) AS l_starts,
+ROUND((SUM(CASE WHEN safe_rosters.status = 'starter' AND safe_rosters.result = 'W' THEN 1 ELSE 0 END) / (SUM(CASE WHEN safe_rosters.status = 'starter' AND safe_rosters.result = 'W' THEN 1 ELSE 0 END) + SUM(CASE WHEN safe_rosters.status = 'starter' AND safe_rosters.result = 'L' THEN 1 ELSE 0 END))) * 100, 2) AS starting_win_percent
+FROM safe_rosters
+JOIN players ON safe_rosters.player_id = players.id
+JOIN leagues ON safe_rosters.league_id = leagues.id`;
 const conditions = [];
-
 
 const params = [];
 
-
 if (leagueFilter) {
-
 
 conditions.push('leagues.type = ?');
 
-
 params.push(leagueFilter);
 
-
 }
-
 
 if (weekFilter) {
 
-
 conditions.push('week = ?');
-
 
 params.push(weekFilter);
 
-
 }
-
 
 if (positionFilter) {
 
-
 conditions.push('players.position = ?');
-
-
 params.push(positionFilter);
-
-
 }
 
 
@@ -146,9 +96,13 @@ query += ` GROUP BY players.id ORDER BY players.${sortedBy} ${sortOrder}`;
 }
 
 
-db.query(query, params,((errors, results)=>{
+db.query(query, params, (errors, results) => {
+
+
     res.json({results});
-}));
+    
+    
+    });
 } catch (error) {
 
 
