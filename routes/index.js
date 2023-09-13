@@ -18,8 +18,8 @@ const leagueFilter = req.query.leagueType || null;
 
 const weekFilter = req.query.week || null;
 
+const yearFilter = req.query.year|| 2023;
 
-const yearFilter = req.query.year.toString() || 2022;
 
 
 const positionFilter = req.query.position || null;
