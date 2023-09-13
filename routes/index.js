@@ -95,102 +95,36 @@ params.push(leagueFilter);
 
 
 }
-
-
 if (weekFilter) {
-
-
 conditions.push('week = ?');
-
-
 params.push(weekFilter);
-
-
 }
-
-
 if (positionFilter) {
-
-
 conditions.push('players.position = ?');
-
-
 params.push(positionFilter);
-
-
 }
-
-
 if (teamFilter) {
-
-
 conditions.push('players.team = ?');
-
-
 params.push(teamFilter);
-
-
 }
-
-
 if (searchFilter) {
-
-
 conditions.push('players.name LIKE ?');
-
-
 params.push(`%${searchFilter}%`);
-
-
 }
-
-
 if (conditions.length > 0) {
-
-
 query += ' AND ' + conditions.join(' AND ');
-
-
 }
-
-
 if (['starter_count', 'nonstarter_count', 'starting_percent', 'w_starts', 'l_starts', 'starting_win_percent','avg_team_points','avg_win_margin'].includes(sortedBy)) {
-
-
 query += ` GROUP BY players.id ORDER BY ${sortedBy} ${sortOrder}`;
-
-
 } else {
-
-
 query += ` GROUP BY players.id ORDER BY players.${sortedBy} ${sortOrder}`;
-
-
 }
-
-
 db.query(query, params, (errors, results) => {
-
-
 res.json({ results });
-
-
 });
-
-
 } catch (error) {
-
-
 console.error(error);
-
-
 res.status(500).json({ error: 'Internal Server Error' });
-
-
 }
-
-
 });
-
-
 module.exports = router;
