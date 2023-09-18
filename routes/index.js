@@ -18,8 +18,8 @@ const leagueFilter = req.query.leagueType || null;
 
 const weekFilter = req.query.week || null;
 
-const yearFilter = req.query.year|| 2022;
 
+const yearFilter = req.query.year || 2022;
 
 
 const positionFilter = req.query.position || null;
@@ -40,84 +40,90 @@ const sortOrder = req.query.sortOrder || 'DESC';
 let query = `
 
 
-SELECT players.*, COUNT(*) AS player_count,
+SELECT
 
 
-SUM(CASE WHEN safe_lineups.status = 'starter' THEN 1 ELSE 0 END) AS starter_count,
+players_copy.*,
 
 
-SUM(CASE WHEN safe_lineups.status = 'nonstarter' THEN 1 ELSE 0 END) AS nonstarter_count,
+COUNT(*) AS player_count,
 
 
-ROUND((SUM(CASE WHEN safe_lineups.status = 'starter' THEN 1 ELSE 0 END) / COUNT(*)) * 100, 2) AS starting_percent,
+SUM(CASE WHEN safe_lineups_copy.status = 'starter' THEN 1 ELSE 0 END) AS starter_count,
 
 
-SUM(CASE WHEN safe_lineups.status = 'starter' AND safe_lineups.result = 'W' THEN 1 ELSE 0 END) AS w_starts,
+SUM(CASE WHEN safe_lineups_copy.status = 'nonstarter' THEN 1 ELSE 0 END) AS nonstarter_count,
 
 
-SUM(CASE WHEN safe_lineups.status = 'starter' AND safe_lineups.result = 'L' THEN 1 ELSE 0 END) AS l_starts,
+ROUND((SUM(CASE WHEN safe_lineups_copy.status = 'starter' THEN 1 ELSE 0 END) / COUNT(*)) * 100, 2) AS starting_percent,
 
 
-ROUND((SUM(CASE WHEN safe_lineups.status = 'starter' AND safe_lineups.result = 'W' THEN 1 ELSE 0 END) / (SUM(CASE WHEN safe_lineups.status = 'starter' AND safe_lineups.result = 'W' THEN 1 ELSE 0 END) + SUM(CASE WHEN safe_lineups.status = 'starter' AND safe_lineups.result = 'L' THEN 1 ELSE 0 END))) * 100, 2) AS starting_win_percent,
+SUM(CASE WHEN safe_lineups_copy.status = 'starter' AND safe_lineups_copy.result = 'W' THEN 1 ELSE 0 END) AS w_starts,
 
 
-ROUND(AVG(CASE WHEN safe_lineups.status = 'starter' AND safe_lineups.result = 'W' THEN safe_lineups.team_points END),2) AS avg_team_points,
+SUM(CASE WHEN safe_lineups_copy.status = 'starter' AND safe_lineups_copy.result = 'L' THEN 1 ELSE 0 END) AS l_starts,
 
 
-ROUND(AVG(CASE WHEN safe_lineups.status = 'starter' AND safe_lineups.result = 'W' THEN safe_lineups.victory_margin END),2) AS avg_win_margin
+ROUND((SUM(CASE WHEN safe_lineups_copy.status = 'starter' AND safe_lineups_copy.result = 'W' THEN 1 ELSE 0 END) / (SUM(CASE WHEN safe_lineups_copy.status = 'starter' AND safe_lineups_copy.result = 'W' THEN 1 ELSE 0 END) + SUM(CASE WHEN safe_lineups_copy.status = 'starter' AND safe_lineups_copy.result = 'L' THEN 1 ELSE 0 END))) * 100, 2) AS starting_win_percent,
 
 
-FROM safe_lineups
+ROUND(SUM(CASE WHEN safe_lineups_copy.status = 'starter' AND safe_lineups_copy.result = 'W' THEN safe_lineups_copy.team_points END) / COUNT(CASE WHEN safe_lineups_copy.status = 'starter' AND safe_lineups_copy.result = 'W' THEN safe_lineups_copy.player_id END), 2) AS avg_team_points,
 
 
-JOIN players ON safe_lineups.player_id = players.id
+ROUND(SUM(CASE WHEN safe_lineups_copy.status = 'starter' AND safe_lineups_copy.result = 'W' THEN safe_lineups_copy.victory_margin END) / COUNT(CASE WHEN safe_lineups_copy.status = 'starter' AND safe_lineups_copy.result = 'W' THEN safe_lineups_copy.player_id END), 2) AS avg_win_margin
 
 
-JOIN safe_leagues ON safe_lineups.league_id = safe_leagues.league_id
+FROM
 
 
-WHERE safe_leagues.year = ? AND safe_lineups.year = ?`;
+safe_lineups_copy
+
+
+JOIN players_copy ON safe_lineups_copy.player_id = players_copy.id
+
+
+JOIN safe_leagues_copy ON safe_lineups_copy.league_id = safe_leagues_copy.league_id
+
+
+WHERE
+
+
+safe_leagues_copy.year = ? AND safe_lineups_copy.year = ?`;
 
 
 const conditions = [];
 
 
 const params = [yearFilter, yearFilter];
-
-
 if (leagueFilter) {
-
-
-conditions.push('safe_leagues.type = ?');
-
-
+conditions.push('safe_leagues_copy.type = ?');
 params.push(leagueFilter);
-
-
 }
 if (weekFilter) {
 conditions.push('week = ?');
 params.push(weekFilter);
 }
 if (positionFilter) {
-conditions.push('players.position = ?');
+conditions.push('players_copy.position = ?');
 params.push(positionFilter);
+
+
 }
 if (teamFilter) {
-conditions.push('players.team = ?');
+conditions.push('players_copy.team = ?');
 params.push(teamFilter);
 }
 if (searchFilter) {
-conditions.push('players.name LIKE ?');
+conditions.push('players_copy.name LIKE ?');
 params.push(`%${searchFilter}%`);
 }
 if (conditions.length > 0) {
 query += ' AND ' + conditions.join(' AND ');
 }
-if (['starter_count', 'nonstarter_count', 'starting_percent', 'w_starts', 'l_starts', 'starting_win_percent','avg_team_points','avg_win_margin'].includes(sortedBy)) {
-query += ` GROUP BY players.id ORDER BY ${sortedBy} ${sortOrder}`;
+if (['starter_count', 'nonstarter_count', 'starting_percent', 'w_starts', 'l_starts', 'starting_win_percent', 'avg_team_points', 'avg_win_margin'].includes(sortedBy)) {
+query += ` GROUP BY players_copy.id ORDER BY ${sortedBy} ${sortOrder} LIMIT 5`;
 } else {
-query += ` GROUP BY players.id ORDER BY players.${sortedBy} ${sortOrder}`;
+query += ` GROUP BY players_copy.id ORDER BY players_copy.${sortedBy} ${sortOrder} LIMIT 5`;
 }
 db.query(query, params, (errors, results) => {
 res.json({ results });
